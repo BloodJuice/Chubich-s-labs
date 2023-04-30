@@ -44,7 +44,8 @@ def initGraduates(mode):
         dH = [np.array([[0]]), np.array([[0]])]
         dR = [np.array([[0]]), np.array([[0]])]
         dx0 = [np.zeros((n, 1)) for i in range(s)]
-    return dF, dPsi, dH, dR, dx0
+        du_dua = np.array([[[1], [0]], [[0], [1]]])
+    return dF, dPsi, dH, dR, dx0, du_dua
 
 
 # Здесь можно проверять сразу основную лабу(mode=2) и 6 пункт из контрольных вопросов(mode=1). При смене mode не забывай менять n
@@ -154,7 +155,7 @@ def dIMF(tetta):
     ####################_____1 пункт____________##############
     mode = n
     F, Psi, H, R, x0, u = initVariables(tetta, mode=mode)
-    dF, dPsi, dH, dR, dx0 = initGraduates(mode=mode)
+    dF, dPsi, dH, dR, dx0, du_dua = initGraduates(mode=mode)
     Fa = np.zeros((n * (s + 1), n * (s + 1)))
 
     # Заполняем матрицу Fa (вертикальные элементы)
@@ -187,50 +188,72 @@ def dIMF(tetta):
             for j in range(len(Psi[0])):
                 PsiA[_ * n + n + i][j] = dPsi[_][i][j]
 
+    print("\nPsiA:\n", PsiA,
+          "\nFa:\n", Fa)
     ####################_____2 пункт____________##############
     dMdu = [np.zeros((2, 2)) for alpha in range(r) for betta in range(N)]
-    Psi_du_dua_betta = [np.zeros((6, 1)) for alpha in range(r)]
-    dxa_tk_plus_one_dua_tbetta = [np.zeros((6, 1)) for alpha in range(r)]
-    dxa_tk_dua_tbetta = [np.zeros((6, 1)) for alpha in range(r)]
+    # Psi_du_dua_betta = [np.zeros((6, 1)) for alpha in range(r)]
+    # dxa_tk_plus_one_dua_tbetta = [np.zeros((6, 1)) for alpha in range(r)]
+    # dxa_tk_dua_tbetta = [np.zeros((6, 1)) for alpha in range(r)]
     delta_M = np.zeros((2, 2))
 
     # Инициализация Xatk
     Xa_tk_plus_one = np.zeros((n * (s + 1), 1))
     Xa_tk = np.zeros((n * (s + 1), 1))
 
-    print("np.matmul(F, x0):\n", np.matmul(F, x0) + np.matmul(Psi, u[0]))
 
-
-
-    for _ in range(N):
-        count = 0
+    for k in range(N):
         ####################_____4 пункт____________##############
-        if _ == 0:
-            x0 = np.matmul(F, x0) + np.matmul(Psi, u[_])
-            x1 = np.matmul(dF[0], x0) + np.matmul(F, dx0[0]) + np.dot(dPsi[0], u[_])
-            x2 = np.matmul(dF[1], x0) + np.matmul(F, dx0[1]) + np.dot(dPsi[1], u[_])
-            Xa_tk_plus_one = np.concatenate((x0, x1, x2))
-        elif _ > 0:
-            Xa_tk_plus_one = np.matmul(Fa, Xa_tk) + np.dot(PsiA, u[_])
-        Xa_tk = Xa_tk_plus_one
+        if n == 2:
+            if k == 0:
+                x_0 = np.matmul(F, x0) + np.dot(Psi, u[k][0])
+                x_1 = np.matmul(dF[0], x0) + np.matmul(F, dx0[0]) + np.dot(dPsi[0], u[k][0])
+                x_2 = np.matmul(dF[1], x0) + np.matmul(F, dx0[1]) + np.dot(dPsi[1], u[k][0])
+                Xa_tk_plus_one = np.concatenate((x_0, x_1, x_2))
+                # print(Xa_tk_plus_one)
+
+            # Расчёт последующих значений для Xa_tk, k > 0:
+            if k > 0:
+                Xa_tk_plus_one = np.matmul(Fa, Xa_tk) + np.dot(PsiA, u[k][0])
+                Xa_tk = Xa_tk_plus_one
+            # print("\nXa_tk_plus_one\n", Xa_tk_plus_one)
+        elif n == 1:
+            if k == 0:
+                x_0 = np.matmul(F, x0) + np.dot(Psi, u[k])
+                x_1 = np.matmul(dF[0], x0) + np.matmul(F, dx0[0]) + np.dot(dPsi[0], u[k])
+                x_2 = np.matmul(dF[1], x0) + np.matmul(F, dx0[1]) + np.dot(dPsi[1], u[k])
+                Xa_tk_plus_one = np.concatenate((x_0, x_1, x_2))
+                # print(Xa_tk_plus_one)
+
+            # Расчёт последующих значений для Xa_tk, k > 0:
+            if k > 0:
+                Xa_tk_plus_one = np.matmul(Fa, Xa_tk) + np.dot(PsiA, u[k])
+                Xa_tk = Xa_tk_plus_one
+
+
+
 
         ####################_____5,6 пункт____________##############
         for betta in range(N):
             for alpha in range(r):
-                if betta == _:
-                    Psi_du_dua_betta[alpha] = PsiA
+                if betta == k:
+                    Psi_du_dua_betta = np.dot(PsiA, du_dua[alpha])
                 else:
-                    Psi_du_dua_betta[alpha] = np.dot(PsiA, 0)
+                    Psi_du_dua_betta = np.dot(PsiA, [[0], [0]])
 
-                if _ == 0:
-                    dxa_tk_plus_one_dua_tbetta[alpha] = Psi_du_dua_betta[alpha]
-                    dxa_tk_dua_tbetta[alpha] = dxa_tk_plus_one_dua_tbetta[alpha]
+                if k == 0:
+                    dxa_tk_plus_one_dua_tbetta = Psi_du_dua_betta
+                    dxa_tk_dua_tbetta = dxa_tk_plus_one_dua_tbetta
                 else:
-                    dxa_tk_plus_one_dua_tbetta[alpha] = np.add(np.dot(Fa, dxa_tk_dua_tbetta[alpha]), Psi_du_dua_betta[alpha])
-                dxa_tk_dua_tbetta[alpha] = dxa_tk_plus_one_dua_tbetta[alpha]
+                    dxa_tk_plus_one_dua_tbetta = np.add(np.dot(Fa, dxa_tk_dua_tbetta), Psi_du_dua_betta)
+                dxa_tk_dua_tbetta = dxa_tk_plus_one_dua_tbetta
 
-                coeff_dxa_tk_plus_one = np.add(np.dot(dxa_tk_plus_one_dua_tbetta[alpha], Xa_tk_plus_one.transpose()),
-                                           np.dot(Xa_tk_plus_one, dxa_tk_plus_one_dua_tbetta[alpha].transpose()))
+                print("\nPsi_du_dua_betta\n", Psi_du_dua_betta,
+                      "\ndxa_tk_plus_one_dua_tbetta\n", dxa_tk_plus_one_dua_tbetta,
+                      "\nbetta:\n", betta)
+
+                coeff_dxa_tk_plus_one = np.add(np.dot(dxa_tk_plus_one_dua_tbetta, Xa_tk_plus_one.transpose()),
+                                       np.dot(Xa_tk_plus_one, dxa_tk_plus_one_dua_tbetta.transpose()))
 
                 for i in range(2):
                     for j in range(2):
@@ -253,10 +276,9 @@ def dIMF(tetta):
                                     coeff_dxa_tk_plus_one,
                                     Ci(I=j + 1,n=n,s=s).transpose(), H.transpose(), pow(R, -1)])
                         delta_M[i][j] = A0 + A1 + A2 + A3
-                dMdu[count] = np.add(dMdu[count], delta_M)
-                count += 1
-        print(dMdu,
-              "\nrate:\n", np.shape(dMdu))
+                dMdu[alpha + 2*betta] = np.add(dMdu[alpha + 2*betta], delta_M)
+    for i in range(2*N):
+        print("\nM[", i, "]\n",dMdu[i])
 
 
 
@@ -266,19 +288,19 @@ if __name__ == '__main__':
     m = q = v = nu = 1
 
     r = 2 # Количество начальных сигналов, альфа
-    n = 2 # Размерность вектора х0
+    n = 1 # Размерность вектора х0
     s = 2 # Количество производных по тетта
-    N = 3 # Число испытаний
+    N = 2 # Число испытаний
 
 
 
     delta = 0.001
 
     tetta_true = np.array([-1.5, 1.0])
-    tetta_false = np.array([-2, 0.01])
+    tetta_false = np.array([-1, 1])
 
     # IMF(tetta_true)
-    dIMF(tetta_true)
+    dIMF(tetta_false)
     # Главная функция второй лабы:
     # dIMF(tetta_else, mode=count)
     # print("Проверка Матрицы Фишера c tetta_else:\n", dIMF_test(u=(u_t0 + delta), tetta=tetta_else))
