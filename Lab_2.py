@@ -99,18 +99,31 @@ def IMF(tetta):
     # Расчёт матрицы Фишера
     for _ in range(N):
         # Расчёт первого значения для Xa_tk, k == 0:
-        if _ == 0:
-            x0 = np.matmul(F, x0) + np.dot(Psi, u[_])
-            x1 = np.matmul(dF[0], x0) + np.matmul(F, dx0[0]) + np.dot(dPsi[0], u[_])
-            x2 = np.matmul(dF[1], x0) + np.matmul(F, dx0[1]) + np.dot(dPsi[1], u[_])
-            Xa_tk_plus_one = np.concatenate((x0, x1, x2))
-            # print(Xa_tk_plus_one)
+        if n >= 2:
+            if _ == 0:
+                x_0 = np.matmul(F, x0) + np.dot(Psi, u[_][0])
+                x_1 = np.matmul(dF[0], x0) + np.matmul(F, dx0[0]) + np.dot(dPsi[0], u[_][0])
+                x_2 = np.matmul(dF[1], x0) + np.matmul(F, dx0[1]) + np.dot(dPsi[1], u[_][0])
+                Xa_tk_plus_one = np.concatenate((x_0, x_1, x_2))
+                # print(Xa_tk_plus_one)
 
-        # Расчёт последующих значений для Xa_tk, k > 0:
-        if _ > 0:
-            Xa_tk_plus_one = np.matmul(Fa, Xa_tk) + np.matmul(PsiA, u[_])
-            Xa_tk = Xa_tk_plus_one
-        # print("\nXa_tk_plus_one\n", Xa_tk_plus_one)
+            # Расчёт последующих значений для Xa_tk, k > 0:
+            if _ > 0:
+                Xa_tk_plus_one = np.matmul(Fa, Xa_tk) + np.dot(PsiA, u[_][0])
+                Xa_tk = Xa_tk_plus_one
+            # print("\nXa_tk_plus_one\n", Xa_tk_plus_one)
+        elif n == 1:
+            if _ == 0:
+                x_0 = np.matmul(F, x0) + np.dot(Psi, u[_])
+                x_1 = np.matmul(dF[0], x0) + np.matmul(F, dx0[0]) + np.dot(dPsi[0], u[_])
+                x_2 = np.matmul(dF[1], x0) + np.matmul(F, dx0[1]) + np.dot(dPsi[1], u[_])
+                Xa_tk_plus_one = np.concatenate((x_0, x_1, x_2))
+                # print(Xa_tk_plus_one)
+
+            # Расчёт последующих значений для Xa_tk, k > 0:
+            if _ > 0:
+                Xa_tk_plus_one = np.matmul(Fa, Xa_tk) + np.dot(PsiA, u[_])
+                Xa_tk = Xa_tk_plus_one
 
         for i in range(2):
             for j in range(2):
@@ -144,7 +157,7 @@ if __name__ == '__main__':
 
     n = 1 # Размерность вектора х0
     s = 2 # Количество производных по тетта
-    N = 1 # Число испытаний
+    N = 2 # Число испытаний
 
     count = 0
 
