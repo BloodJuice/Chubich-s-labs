@@ -120,7 +120,6 @@ def IMF(tetta):
                 # Расчёт последующих значений для Xa_tk, k > 0:
                 if k > 0:
                     Xa_tk_plus_one = np.matmul(Fa, Xa_tk) + np.dot(PsiA, u[k][0])
-                    Xa_tk = Xa_tk_plus_one
                 # print("\nXa_tk_plus_one\n", Xa_tk_plus_one)
             elif n == 1:
                 if k == 0:
@@ -134,6 +133,7 @@ def IMF(tetta):
                 if k > 0:
                     Xa_tk_plus_one = np.matmul(Fa, Xa_tk) + np.dot(PsiA, u[k])
                     Xa_tk = Xa_tk_plus_one
+            Xa_tk = Xa_tk_plus_one
 
             for i in range(2):
                 for j in range(2):
@@ -238,7 +238,7 @@ def dIMF(tetta):
             # Расчёт последующих значений для Xa_tk, k > 0:
             if k > 0:
                 Xa_tk_plus_one = np.matmul(Fa, Xa_tk) + np.dot(PsiA, u[k][0])
-                Xa_tk = Xa_tk_plus_one
+
         elif n == 1:
             if k == 0:
                 x_0 = np.matmul(F, x0) + np.dot(Psi, u[k])
@@ -250,8 +250,7 @@ def dIMF(tetta):
             # Расчёт последующих значений для Xa_tk, k > 0:
             if k > 0:
                 Xa_tk_plus_one = np.matmul(Fa, Xa_tk) + np.dot(PsiA, u[k])
-                Xa_tk = Xa_tk_plus_one
-        # print("\nXa_tk_plus_one\n", Xa_tk_plus_one)
+        Xa_tk = Xa_tk_plus_one
 
 
 
@@ -279,6 +278,14 @@ def dIMF(tetta):
                 coeff_dxa_tk_plus_one = np.add(np.dot(dxa_tk_plus_one_dua_tbetta, Xa_tk_plus_one.transpose()),
                                        np.dot(Xa_tk_plus_one, dxa_tk_plus_one_dua_tbetta.transpose()))
 
+                print("For k =",k , "betta =", betta, "\n",
+                      "\nXa_tk_plus_one\n",Xa_tk_plus_one,
+                    "\nPsi_du_dua_betta\n", Psi_du_dua_betta,
+                      "\ndxa_tk_dua_tbetta:\n", dxa_tk_dua_tbetta,
+                      "\nFa:\n", Fa,
+                    "\ndxa_tk_plus_one_dua_tbetta\n", dxa_tk_plus_one_dua_tbetta)
+
+
                 for i in range(2):
                     for j in range(2):
                         A0 = reduce(np.dot, [dH[i], Ci(I=0,n=n,s=s),
@@ -303,10 +310,11 @@ def dIMF(tetta):
                 dMdu[count] = np.add(dMdu[count], delta_M)
                 count += 1
 
-
+    dMdu_count = np.zeros((2, 2))
     for i in range(r*N):
+        dMdu_count += dMdu[i]
         print("\nM[", i, "]\n",dMdu[i])
-
+    print("\ndMdu_count:\n", dMdu_count)
 
 
 
@@ -314,8 +322,8 @@ if __name__ == '__main__':
     # Определение переменных
     m = q = v = nu = 1
 
-    r = 1 # Количество начальных сигналов, альфа
-    n = 2 # Размерность вектора х0
+    r = 2 # Количество начальных сигналов, альфа
+    n = 1 # Размерность вектора х0
     s = 2 # Количество производных по тетта
     N = 2 # Число испытаний
 

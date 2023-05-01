@@ -105,7 +105,6 @@ def IMF(tetta):
                 x_1 = np.matmul(dF[0], x0) + np.matmul(F, dx0[0]) + np.dot(dPsi[0], u[_][0])
                 x_2 = np.matmul(dF[1], x0) + np.matmul(F, dx0[1]) + np.dot(dPsi[1], u[_][0])
                 Xa_tk_plus_one = np.concatenate((x_0, x_1, x_2))
-                # print(Xa_tk_plus_one)
 
             # Расчёт последующих значений для Xa_tk, k > 0:
             if _ > 0:
@@ -123,7 +122,7 @@ def IMF(tetta):
             # Расчёт последующих значений для Xa_tk, k > 0:
             if _ > 0:
                 Xa_tk_plus_one = np.matmul(Fa, Xa_tk) + np.dot(PsiA, u[_])
-                Xa_tk = Xa_tk_plus_one
+        Xa_tk = Xa_tk_plus_one
 
         for i in range(2):
             for j in range(2):
@@ -155,18 +154,18 @@ if __name__ == '__main__':
     # Определение переменных
     m = q = v = nu = 1
 
-    n = 1 # Размерность вектора х0
+    n = 2 # Размерность вектора х0
     s = 2 # Количество производных по тетта
-    N = 2 # Число испытаний
+    N = 3 # Число испытаний
 
     count = 0
 
     delta = 0.001
 
     tetta_true = np.array([-1.5, 1.0])
-    tetta_false = np.array([-2, 0.01])
+    tetta_false = np.array([-1, 1])
 
-    IMF(tetta_true)
+    IMF(tetta_false)
 
     # Главная функция второй лабы:
     # dIMF(tetta_else, mode=count)
