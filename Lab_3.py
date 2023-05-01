@@ -158,7 +158,7 @@ def IMF(tetta):
                     # print("A3_M2", A3)
                     delta_M[i][j] = A0 + A1 + A2 + A3
             M = np.add(M, delta_M)
-        print("\nM:\n", M)
+        print("\nM[",_,"]", M)
         if _ == 0:
             M1 = M
             for _ in range(N):
@@ -210,8 +210,13 @@ def dIMF(tetta):
     ####################_____2 пункт____________##############
     dMdu = [np.zeros((2, 2)) for alpha in range(r) for betta in range(N)]
     # Psi_du_dua_betta = [np.zeros((6, 1)) for alpha in range(r)]
-    # dxa_tk_plus_one_dua_tbetta = [np.zeros((6, 1)) for alpha in range(r)]
-    # dxa_tk_dua_tbetta = [np.zeros((6, 1)) for alpha in range(r)]
+    if mode == 2:
+        dxa_tk_plus_one_dua_tbetta = [np.zeros((6, 1)) for alpha in range(r) for betta in range(N)]
+        dxa_tk_dua_tbetta = [np.zeros((6, 1)) for alpha in range(r) for betta in range(N)]
+    elif mode == 1:
+        dxa_tk_plus_one_dua_tbetta = [np.zeros((3, 1)) for alpha in range(r) for betta in range(N)]
+        dxa_tk_dua_tbetta = [np.zeros((3, 1)) for alpha in range(r) for betta in range(N)]
+
     delta_M = np.zeros((2, 2))
 
     # Инициализация Xatk
@@ -220,9 +225,6 @@ def dIMF(tetta):
 
     # Определяю размерности для Psi_du_dua_betta dxa_tk_dua_tbetta
     Psi_du_dua_betta = PsiA
-    dxa_tk_dua_tbetta = Psi_du_dua_betta
-
-    print("PsiA\n", PsiA)
 
     for k in range(N):
         count = 0
@@ -252,8 +254,6 @@ def dIMF(tetta):
                 Xa_tk_plus_one = np.matmul(Fa, Xa_tk) + np.dot(PsiA, u[k])
         Xa_tk = Xa_tk_plus_one
 
-
-
         ####################_____5,6 пункт____________##############
         for betta in range(N):
             for alpha in range(r):
@@ -269,22 +269,14 @@ def dIMF(tetta):
                         Psi_du_dua_betta = np.dot(PsiA, [[0]])
 
                 if k == 0:
-                    dxa_tk_plus_one_dua_tbetta = Psi_du_dua_betta
+                    dxa_tk_plus_one_dua_tbetta[betta] = Psi_du_dua_betta
 
                 else:
-                    dxa_tk_plus_one_dua_tbetta = np.add(np.dot(Fa, dxa_tk_dua_tbetta), Psi_du_dua_betta)
-                dxa_tk_dua_tbetta = dxa_tk_plus_one_dua_tbetta
+                    dxa_tk_plus_one_dua_tbetta[betta] = np.add(np.dot(Fa, dxa_tk_dua_tbetta[betta]), Psi_du_dua_betta)
+                dxa_tk_dua_tbetta[betta] = dxa_tk_plus_one_dua_tbetta[betta]
 
-                coeff_dxa_tk_plus_one = np.add(np.dot(dxa_tk_plus_one_dua_tbetta, Xa_tk_plus_one.transpose()),
-                                       np.dot(Xa_tk_plus_one, dxa_tk_plus_one_dua_tbetta.transpose()))
-
-                print("For k =",k , "betta =", betta, "\n",
-                      "\nXa_tk_plus_one\n",Xa_tk_plus_one,
-                    "\nPsi_du_dua_betta\n", Psi_du_dua_betta,
-                      "\ndxa_tk_dua_tbetta:\n", dxa_tk_dua_tbetta,
-                      "\nFa:\n", Fa,
-                    "\ndxa_tk_plus_one_dua_tbetta\n", dxa_tk_plus_one_dua_tbetta)
-
+                coeff_dxa_tk_plus_one = np.add(np.dot(dxa_tk_plus_one_dua_tbetta[betta], Xa_tk_plus_one.transpose()),
+                                       np.dot(Xa_tk_plus_one, dxa_tk_plus_one_dua_tbetta[betta].transpose()))
 
                 for i in range(2):
                     for j in range(2):
@@ -322,25 +314,17 @@ if __name__ == '__main__':
     # Определение переменных
     m = q = v = nu = 1
 
-    r = 2 # Количество начальных сигналов, альфа
-    n = 1 # Размерность вектора х0
+    r = 1 # Количество начальных сигналов, альфа
+    n = 2 # Размерность вектора х0
     s = 2 # Количество производных по тетта
-    N = 2 # Число испытаний
+    N = 20 # Число испытаний
 
 
 
     delta = 0.00001
 
     tetta_true = np.array([-1.5, 1.0])
-    tetta_false = np.array([-1, 1])
+    tetta_false = np.array([-2, 0.01])
 
-    # IMF(tetta_true)
     IMF(tetta_false)
     dIMF(tetta_false)
-    # Главная функция второй лабы:
-    # dIMF(tetta_else, mode=count)
-    # print("Проверка Матрицы Фишера c tetta_else:\n", dIMF_test(u=(u_t0 + delta), tetta=tetta_else))
-    # print("Матрица Фишера с ложной теттой:\n",dIMF(tetta_else, mode=count))
-    # print("Матрица Фишера с истинной теттой:\n", dIMF(tetta_true, mode=count))
-    # c = dIMF_test(u=(u_t0 + delta), tetta=tetta_else)
-
