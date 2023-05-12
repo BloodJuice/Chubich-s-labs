@@ -323,10 +323,13 @@ def startPlan():
         startMatrixPlan = p[0][step] * np.add(startMatrixPlan, IMF(U=U_[step], tetta=tetta_true))
     return startMatrixPlan, U_
 
-def AOptimality(U, Ksik):
+def AOptimality(U, Ksik, number):
     # Добавил к U reshape, т.к. функция минимизации превращает мою матрицу N на 1 в дурацкое (N, )
     U = U.reshape(N, 1)
-    return (np.dot(pow(np.linalg.inv(IMF(U=Ksik, tetta=tetta_true)), 2), IMF(U=U, tetta=tetta_true))).trace()
+    if number == 1:
+        return (np.dot(pow(np.linalg.inv(IMF(U=Ksik, tetta=tetta_true)), 2), IMF(U=U, tetta=tetta_true))).trace()
+    if number == 3:
+        return (np.linalg.inv(IMF(Ksik, tetta_true))).trace()
 
 def dAOptimality(U, Ksik):
     return (np.dot(pow(np.linalg.inv(IMF(U=Ksik, tetta=tetta_true)), 2), dIMF(U=U, tetta=tetta_true))).trace()
@@ -337,27 +340,27 @@ def DOptimality(U, Ksik):
 def dDOptimality(U, Ksik):
     return (np.dot(np.linalg.inv(IMF(U=Ksik, tetta=tetta_true)), dIMF(U=U, tetta=tetta_true))).trace()
 
-def eta(KsiStar):
-    return (np.linalg.inv(U=KsiStar, tetta=tetta_true))
-
 def Optimalitys(U, Ksik, number):
     x_start = U
     result = ''
     KsiStar = ''
 
-    # Расчёт эты:
+    # Расчёт эты, при этом number == 3!:
     if number == 3:
-        KsiStar = minimize(fun=(np.linalg.inv(IMF)).trace(), x0=Ksik)
-        print("\nKsiStar:\n", KsiStar)
-    print("\nU:\n", U,
-          "\nsize:\n", np.shape(U),
-          "\nKsik:\n", Ksik,
-          "\nsize:\n", np.shape(Ksik))
+        KsiStar = (minimize(fun=AOptimality, x0=Ksik, args=(U, number, ), method='cobyla')).__getitem__("x")
+        eta_ = (minimize(fun=AOptimality, x0=KsiStar, args=(U, number, ), method='cobyla')).__getitem__("x")
+        return eta_
+
+
 
     print("\nmimimize...\n")
+
+    # Расчёт ню для А-оптимальности, при этом number == 1!
     if number == 1:
-        result = minimize(AOptimality, x_start, args=(Ksik,), method='cobyla')
-        print("\nresult:\n", result)
+        result = minimize(AOptimality, x_start, args=(Ksik, number, ), method='cobyla')
+        return result.__getitem__("x")
+
+    # Расчёт ню для D-оптимальности
     if number == 2:
         result = minimize(DOptimality, x_start, args=(Ksik,), method='cobyla')
         print("\nresult:\n", result)
@@ -369,12 +372,23 @@ def ADPlan_third_lab():
     # 2 пункт:
     U0 = np.array([[float(np.random.uniform(0.1, 10.)) for stepi in range(1)] for stepj in range(N)])
 
-    # eta = Optimalitys(U=U0, Ksik=Ksik[0], number=3)
-    Optimalitys(U=U0, Ksik=Ksik[0], number=1)
-
-
-
-
+    eta = Optimalitys(U=U0, Ksik=Ksik[0], number=3)
+    eta = eta.reshape(1, N)
+    Uk = (Optimalitys(U=U0, Ksik=Ksik[0], number=1)) * (-1)
+    Uk = Uk.reshape(1, N)
+    nuUk = Optimalitys(Uk, Ksik[0], 1)
+    nuUk = nuUk.reshape(1, N)
+    print("\neta:\n", eta)
+    print("\nUk:\n", Uk)
+    print("\nnuUk\n", nuUk)
+    count = np.subtract(nuUk, eta)
+    print("\ncount\n", count)
+    if (abs(count[0][0]) <= delta):
+        print("\nEnd process\n")
+    elif (nuUk[0][0] > eta[0][0]):
+        print("\nLet's go to 3 point!\n")
+    else:
+        print("\nStart new 2 point\n")
 
 
 if __name__ == '__main__':
