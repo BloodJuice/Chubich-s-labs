@@ -302,6 +302,12 @@ def dIMF(U, tetta):
         # print("\nM[", i, "]\n",dMdu[i])
     return dMdu_count
 
+def MatrixForPlan(U, p):
+    MatrixPlan = np.array([[0, 0], [0, 0]])
+    for step in range(q):
+        MatrixPlan = p[0][step] * (np.add(MatrixPlan, IMF(U=U[step], tetta=tetta_true)))
+    return MatrixPlan
+
 def startPlan():
     startMatrixPlan = np.array([[0, 0], [0, 0]])
     uDraft = np.zeros((1, N))
@@ -312,83 +318,83 @@ def startPlan():
     # нам нужны столбцы-вектора U, а после генерации появляются не совсем они.
 
     p = np.array([[0.25] for step in range(q)]).transpose()
-    U_ = np.array([[np.random.uniform(0.1, 10.) for stepj in range(N)] for stepi in range(q)])
+    U_ = np.array([[np.random.uniform(0.001, 10.) for stepj in range(N)] for stepi in range(q)])
 
     for stepj in range(q):
         uDraft = U_[stepj]
         for stepi in range(N):
             uClean[stepj][stepi] = uDraft[stepi]
     U_ = uClean
-    for step in range(q):
-        startMatrixPlan = p[0][step] * np.add(startMatrixPlan, IMF(U=U_[step], tetta=tetta_true))
-    return startMatrixPlan, U_
+    startMatrixPlan = MatrixForPlan(U_, p)
+    return startMatrixPlan, U_, p
 
-def AOptimality(U, Ksik, number):
+def AOptimality(U, Ksik, p, number):
     # Добавил к U reshape, т.к. функция минимизации превращает мою матрицу N на 1 в дурацкое (N, )
-    U = U.reshape(N, 1)
-    if number == 1:
-        return (np.dot(pow(np.linalg.inv(IMF(U=Ksik, tetta=tetta_true)), 2), IMF(U=U, tetta=tetta_true))).trace()
+    if (number == 1) or (number == 2):
+        U = U.reshape(N, 1)
+        Ksik = Ksik.reshape(q, N, 1)
+        if number == 1:
+            return (-1) * (np.dot(pow(np.linalg.inv(MatrixForPlan(Ksik, p)), 2), IMF(U=U, tetta=tetta_true))).trace()
+        return (np.dot(pow(np.linalg.inv(MatrixForPlan(Ksik, p)), 2), IMF(U=U, tetta=tetta_true))).trace()
     if number == 3:
-        return (np.linalg.inv(IMF(Ksik, tetta_true))).trace()
+        Ksik = U.reshape(q, N, 1)
+        return (np.linalg.inv(MatrixForPlan(Ksik, p))).trace()
 
-def dAOptimality(U, Ksik):
-    return (np.dot(pow(np.linalg.inv(IMF(U=Ksik, tetta=tetta_true)), 2), dIMF(U=U, tetta=tetta_true))).trace()
-
-def DOptimality(U, Ksik):
-    return (np.dot(np.linalg.inv(IMF(U=Ksik, tetta=tetta_true)), IMF(U=U, tetta=tetta_true))).trace()
-
-def dDOptimality(U, Ksik):
-    return (np.dot(np.linalg.inv(IMF(U=Ksik, tetta=tetta_true)), dIMF(U=U, tetta=tetta_true))).trace()
-
-def Optimalitys(U, Ksik, number):
-    x_start = U
+def Optimalitys(U, Ksik, p, number):
     result = ''
-    KsiStar = ''
-
-    # Расчёт эты, при этом number == 3!:
-    if number == 3:
-        KsiStar = (minimize(fun=AOptimality, x0=Ksik, args=(U, number, ), method='cobyla')).__getitem__("x")
-        eta_ = (minimize(fun=AOptimality, x0=KsiStar, args=(U, number, ), method='cobyla')).__getitem__("x")
-        return eta_
-
-
-
+    KsikStar = ''
     print("\nmimimize...\n")
 
     # Расчёт ню для А-оптимальности, при этом number == 1!
     if number == 1:
-        result = minimize(AOptimality, x_start, args=(Ksik, number, ), method='cobyla')
+        result = minimize(AOptimality, U, args=(Ksik, p, number, ), method='cobyla')
+        print("\nresult:\n", result)
         return result.__getitem__("x")
 
-    # Расчёт ню для D-оптимальности
     if number == 2:
-        result = minimize(DOptimality, x_start, args=(Ksik,), method='cobyla')
-        print("\nresult:\n", result)
+        return AOptimality(U=U, Ksik=Ksik, p=p, number=number)
+
+    # Расчёт эты, при этом number == 3!:
+    if number == 3:
+        # print("\nKsik:\n", Ksik)
+        return AOptimality(U=Ksik, Ksik=U, p=p, number=number)
+
+def NewPlan(tk, Ksik, Uk, p):
+    ksikNew = (1 - tk) * Ksik + tk * Uk
 
 def ADPlan_third_lab():
     # 1 пункт:
-    startMatrixPlan, Ksik = startPlan()
+    startMatrixPlan, Ksik, p = startPlan()
 
+    KsikLine = np.zeros((N*q, )) #Данный список мне необходим для запуска всех минимизаций, т.к. Эти самые минимизации требуют списки, размером (n, )
+    count = 0
+    for stepz in range(N):
+        for stepj in range(q):
+            for stepi in range(1):
+                KsikLine[count] = Ksik[stepj][stepz][stepi]
+                count += 1
+
+    U0 = np.array([[float(np.random.uniform(0.001, 10.)) for stepi in range(1)] for stepj in range(N)])
+    print("\nU0\n", U0)
     # 2 пункт:
-    U0 = np.array([[float(np.random.uniform(0.1, 10.)) for stepi in range(1)] for stepj in range(N)])
-
-    eta = Optimalitys(U=U0, Ksik=Ksik[0], number=3)
-    eta = eta.reshape(1, N)
-    Uk = (Optimalitys(U=U0, Ksik=Ksik[0], number=1)) * (-1)
-    Uk = Uk.reshape(1, N)
-    nuUk = Optimalitys(Uk, Ksik[0], 1)
-    nuUk = nuUk.reshape(1, N)
-    print("\neta:\n", eta)
-    print("\nUk:\n", Uk)
-    print("\nnuUk\n", nuUk)
-    count = np.subtract(nuUk, eta)
-    print("\ncount\n", count)
-    if (abs(count[0][0]) <= delta):
-        print("\nEnd process\n")
-    elif (nuUk[0][0] > eta[0][0]):
-        print("\nLet's go to 3 point!\n")
-    else:
-        print("\nStart new 2 point\n")
+    seconflag = 0
+    while seconflag == 0:
+        U0 = np.array([[float(np.random.uniform(0.1, 10.)) for stepi in range(1)] for stepj in range(N)])
+        Uk = Optimalitys(U=U0, Ksik=KsikLine, p=p, number=1)
+        print("\nUk:\n", Uk)
+        nuUk = Optimalitys(U=Uk, Ksik=KsikLine, p=p, number=2)
+        eta = Optimalitys(U=U0, Ksik=KsikLine, p=p, number=3)
+        print("\nUk:\n", Uk,
+              "\neta:\n", eta,
+              "\nnuUk:\n", nuUk)
+        if abs(nuUk - eta) <= delta:
+            print("\nGood job!\n")
+            seconflag += 1
+        elif nuUk > eta:
+            print("\nLet's go to the third point!\n")
+            seconflag += 1
+        else:
+            print("\nLet's go to the second point!\n")
 
 
 if __name__ == '__main__':
