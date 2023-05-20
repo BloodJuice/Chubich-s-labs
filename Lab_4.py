@@ -1,6 +1,7 @@
 from functools import reduce
 import numpy as np
 from scipy.optimize import minimize, Bounds
+from collections import Counter
 
 # return matrix_ci
 def Ci(I, n, s):
@@ -304,8 +305,8 @@ def dIMF(U, tetta):
 
 def MatrixForPlan(U, p):
     MatrixPlan = np.array([[0, 0], [0, 0]])
-    for step in range(q):
-        MatrixPlan = p[0][step] * (np.add(MatrixPlan, IMF(U=U[step], tetta=tetta_true)))
+    for step in range(len(p)):
+        MatrixPlan = p[step] * (np.add(MatrixPlan, IMF(U=U[step], tetta=tetta_true)))
     return MatrixPlan
 
 def startPlan():
@@ -317,9 +318,8 @@ def startPlan():
     # Для этого мы генерируем матрицу значений U, а после её транспонируем, т.к
     # нам нужны столбцы-вектора U, а после генерации появляются не совсем они.
 
-    p = np.array([[0.25] for step in range(q)]).transpose()
+    p = np.array([0.25 for step in range(q)]).transpose()
     U_ = np.array([[np.random.uniform(0.001, 10.) for stepj in range(N)] for stepi in range(q)])
-
     for stepj in range(q):
         uDraft = U_[stepj]
         for stepi in range(N):
@@ -327,75 +327,142 @@ def startPlan():
     U_ = uClean
     startMatrixPlan = MatrixForPlan(U_, p)
     return startMatrixPlan, U_, p
+def NewPlan(tk, Ksik, Uk, p):
+    ksikNew = np.hstack((Ksik, Uk))
+    for i in range(len(p)):
+        p[i] = (1 - tk) * p[i]
+    pNew = np.hstack((p, tk))
+    return ksikNew, pNew
+def CleaningPlan(Ksik, p):
+    count = Counter(p).most_common()
+    newpi = [i for i in count if int(i[1]) >= 2] # p, содержащая только веса, которые встречаются больше двух раз
+    newKsik = []
+    saverDraft, saverCount = [], []
 
-def AOptimality(U, Ksik, p, number):
+    # Ищу номера позиций векторов с одинаковыми весами при помощи списка р
+    for i in range(len(newpi)):
+        for j in range(len(p)):
+            if p[j] == newpi[i][0]:
+                saverDraft.append(j)
+        saverCount.append(saverDraft)
+        saverDraft = []
+    print("\np:\n", p)
+
+    # Объединение всех одинаковых весов, которые встречаются чаще одного раза:
+    Ksik = Ksik.reshape(len(p), N, 1)
+    for i in range(len(newpi)):
+        for j in range(len(saverCount[i]) - 1):
+            Ksik[saverCount[i][0]] += Ksik[saverCount[i][j + 1]]
+        newKsik.append(Ksik[saverCount[i][0]])
+
+    # Ищу номера позиций векторов с одинаковыми весами при помощи списка р
+    newpj = [i for i in count if int(i[1]) == 1] # p, содержащая только веса, которые встречаются один раз
+    saverCount *= 0
+    for i in range(len(newpj)):
+        for j in range(len(p)):
+            if p[j] == newpj[i][0]:
+                saverDraft.append(j)
+        saverCount.append(saverDraft)
+        saverDraft = []
+
+    # Объединение всех одинаковых весов, которые встречаются один раз:
+    for i in range(len(newpj)):
+        for j in range(len(saverCount[i]) - 1):
+            Ksik[saverCount[i][0]] += Ksik[saverCount[i][j + 1]]
+        newKsik.append(Ksik[saverCount[i][0]])
+
+    # Создание нового списка значений р:
+    newpi += newpj
+    newp = []
+    for i in range(len(newpi)):
+        newp.append(newpi[i][0])
+    print("\nnewKsik:\n", newKsik)
+    return newKsik, newp
+
+def AOptimality(U, Ksik, p, number, lenQ):
     # Добавил к U reshape, т.к. функция минимизации превращает мою матрицу N на 1 в дурацкое (N, )
     if (number == 1) or (number == 2):
         U = U.reshape(N, 1)
-        Ksik = Ksik.reshape(q, N, 1)
+        Ksik = Ksik.reshape(lenQ, N, 1)
         if number == 1:
             return (-1) * (np.dot(pow(np.linalg.inv(MatrixForPlan(Ksik, p)), 2), IMF(U=U, tetta=tetta_true))).trace()
         return (np.dot(pow(np.linalg.inv(MatrixForPlan(Ksik, p)), 2), IMF(U=U, tetta=tetta_true))).trace()
     if number == 3:
-        Ksik = U.reshape(q, N, 1)
+        Ksik = U.reshape(lenQ, N, 1)
+        return (np.linalg.inv(MatrixForPlan(Ksik, p))).trace()
+    if number == 4:
+        Ksik = U.reshape(lenQ, N, 1)
         return (np.linalg.inv(MatrixForPlan(Ksik, p))).trace()
 
-def Optimalitys(U, Ksik, p, number):
+def Optimalitys(U, Ksik, p, number, lenQ):
     result = ''
-    KsikStar = ''
+    XMKsi = ''
     print("\nmimimize...\n")
 
     # Расчёт ню для А-оптимальности, при этом number == 1!
     if number == 1:
-        result = minimize(AOptimality, U, args=(Ksik, p, number, ), method='cobyla')
-        print("\nresult:\n", result)
+        result = minimize(AOptimality, U, args=(Ksik, p, number, lenQ, ), method='cobyla')
+        # print("\nresult:\n", result)
         return result.__getitem__("x")
 
+    # Расчёт nuUk, при этом number == 2!:
     if number == 2:
-        return AOptimality(U=U, Ksik=Ksik, p=p, number=number)
+        return AOptimality(U=U, Ksik=Ksik, p=p, number=number, lenQ=lenQ)
 
     # Расчёт эты, при этом number == 3!:
     if number == 3:
         # print("\nKsik:\n", Ksik)
-        return AOptimality(U=Ksik, Ksik=U, p=p, number=number)
+        return AOptimality(U=Ksik, Ksik=U, p=p, number=number, lenQ=lenQ)
 
-def NewPlan(tk, Ksik, Uk, p):
-    ksikNew = (1 - tk) * Ksik + tk * Uk
+    # Расчёт tk, при этом number == 4!:
+    if number == 4:
+        XMKsi = minimize(AOptimality, x0=Ksik, args=(U, p, number, lenQ, ), method='cobyla')
+        # print("\nXMKsi:\n", XMKsi)
+    return AOptimality(U=XMKsi.__getitem__('x'), Ksik=U, p=p, number=number, lenQ=lenQ)
+
+
+
 
 def ADPlan_third_lab():
     # 1 пункт:
     startMatrixPlan, Ksik, p = startPlan()
-
-    KsikLine = np.zeros((N*q, )) #Данный список мне необходим для запуска всех минимизаций, т.к. Эти самые минимизации требуют списки, размером (n, )
+    tk = 0.1
+    Uk = np.zeros((N, 1))
     count = 0
-    for stepz in range(N):
-        for stepj in range(q):
-            for stepi in range(1):
-                KsikLine[count] = Ksik[stepj][stepz][stepi]
-                count += 1
-
-    U0 = np.array([[float(np.random.uniform(0.001, 10.)) for stepi in range(1)] for stepj in range(N)])
-    print("\nU0\n", U0)
     # 2 пункт:
-    seconflag = 0
-    while seconflag == 0:
-        U0 = np.array([[float(np.random.uniform(0.1, 10.)) for stepi in range(1)] for stepj in range(N)])
-        Uk = Optimalitys(U=U0, Ksik=KsikLine, p=p, number=1)
-        print("\nUk:\n", Uk)
-        nuUk = Optimalitys(U=Uk, Ksik=KsikLine, p=p, number=2)
-        eta = Optimalitys(U=U0, Ksik=KsikLine, p=p, number=3)
-        print("\nUk:\n", Uk,
-              "\neta:\n", eta,
-              "\nnuUk:\n", nuUk)
-        if abs(nuUk - eta) <= delta:
-            print("\nGood job!\n")
-            seconflag += 1
-        elif nuUk > eta:
-            print("\nLet's go to the third point!\n")
-            seconflag += 1
-        else:
-            print("\nLet's go to the second point!\n")
-
+    while 1:
+        # Данный список мне необходим для запуска всех минимизаций, т.к. Эти самые минимизации требуют списки, размером (n, )
+        KsikLine = []
+        for stepz in range(len(Ksik)):
+            for stepj in range(len(Ksik[0])):
+                for stepi in range(1):
+                    KsikLine.append(Ksik[stepz][stepj][stepi])
+        KsikLine = np.array(KsikLine)
+        print("\nKsikLine:\n", KsikLine)
+        while 1:
+            U0 = np.array([[float(np.random.uniform(0.1, 10.)) for stepi in range(1)] for stepj in range(N)])
+            Uk = Optimalitys(U=U0, Ksik=KsikLine, p=p, number=1, lenQ=len(p))
+            nuUk = Optimalitys(U=Uk, Ksik=KsikLine, p=p, number=2, lenQ=len(p))
+            eta = Optimalitys(U=U0, Ksik=KsikLine, p=p, number=3, lenQ=len(p))
+            # print("\nUk:\n", Uk,
+            #       "\neta:\n", eta,
+            #       "\nnuUk:\n", nuUk)
+            if abs(nuUk - eta) <= delta:
+                # print("\nGood job!\n", KsikLine.reshape(len(p), N, 1),
+                #       "\np:\n", p)
+                break
+            elif nuUk > eta:
+                print("\nLet's go to the third point!\n")
+                break
+            else:
+                print("\nLet's go to the second point!\n")
+        if count == 0:
+            KsikLine, p = NewPlan(tk, Ksik=KsikLine, Uk=Uk, p=p)
+            count += 1
+        tk = Optimalitys(U=Uk, Ksik=KsikLine, p=p, number=4, lenQ=len(p))
+        Ksik, p = NewPlan(tk, Ksik=KsikLine, Uk=Uk, p=p)
+        Ksik, p = CleaningPlan(Ksik, p)
+        print("\nKsik, end cycle:\n", Ksik)
 
 if __name__ == '__main__':
     # Определение переменных
@@ -404,7 +471,7 @@ if __name__ == '__main__':
     r = 1 # Количество начальных сигналов, альфа
     n = 2 # Размерность вектора х0
     s = 2 # Количество производных по тетта
-    N = 4 # Число испытаний
+    N = 3 # Число испытаний
 
     q = int(1 + (s*(s + 1)) / 2)
     delta = 0.0001
