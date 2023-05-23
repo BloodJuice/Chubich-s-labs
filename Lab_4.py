@@ -297,11 +297,9 @@ def dIMF(U, tetta):
                 dMdu[count] = np.add(dMdu[count], delta_M)
                 count += 1
 
-    dMdu_count = np.zeros((2, 2))
-    for i in range(r*N):
-        dMdu_count += dMdu[i]
-        # print("\nM[", i, "]\n",dMdu[i])
-    return dMdu_count
+    # for i in range(r*N):
+    #     print("\nM[", i, "]\n",dMdu[i])
+    return dMdu
 
 def MatrixForPlan(U, p):
     MatrixPlan = np.array([[0, 0], [0, 0]])
@@ -350,7 +348,7 @@ def CleaningPlan(Ksik, p):
     for stepi in range(Q):
         if p[stepi] < delta:
             pDelPoint.append(stepi)
-    print("\npDelPoint:\n", pDelPoint)
+
     for stepi in range(Q):
         if stepi not in pDelPoint:
             newKsik.append(Ksik[stepi])
@@ -366,45 +364,59 @@ def CleaningPlan(Ksik, p):
     newp = np.array(newp)
     return newKsik, newp
 
-def AOptimality(U, Ksik, p, number, lenQ):
+def AOptimality(U, Ksik, p, number):
     # Добавил к U reshape, т.к. функция минимизации превращает мою матрицу N на 1 в дурацкое (N, )
+    Q = len(p)
     if (number == 1) or (number == 2):
         U = U.reshape(N, 1)
-        Ksik = Ksik.reshape(lenQ, N, 1)
+        Ksik = Ksik.reshape(Q, N, 1)
         if number == 1:
             return (-1) * (np.dot(pow(np.linalg.inv(MatrixForPlan(Ksik, p)), 2), IMF(U=U, tetta=tetta_true))).trace()
         return (np.dot(pow(np.linalg.inv(MatrixForPlan(Ksik, p)), 2), IMF(U=U, tetta=tetta_true))).trace()
     if number == 3:
-        Ksik = U.reshape(lenQ, N, 1)
+        Ksik = U.reshape(Q, N, 1)
         return (np.linalg.inv(MatrixForPlan(Ksik, p))).trace()
     if number == 4:
-        Ksik = U.reshape(lenQ, N, 1)
+        Ksik = U.reshape(Q, N, 1)
         return (np.linalg.inv(MatrixForPlan(Ksik, p))).trace()
+
+def dAOptimality(U, Ksik, p, number):
+    dnu = [np.zeros((2, 2)) for betta in range(N)]
+    Q = len(p)
+    U = U.reshape((N, 1))
+    Ksik = Ksik.reshape(Q, N, 1)
+    dImf = dIMF(U, tetta_true)
+
+    for stepi in range(N):
+        dnu[stepi] = (np.dot(pow(np.linalg.inv(MatrixForPlan(Ksik, p)), 2), dImf[stepi])).trace()
+    return dnu
 
 def Optimalitys(U, Ksik, p, number, lenQ):
     XMKsi = ''
     print("\nmimimize...\n")
-
+    lim = [0, 0, 0, 10, 10, 10]
+    bounds = Bounds([lim[0], lim[0],
+                     lim[3], lim[3]])
     # Расчёт ню для А-оптимальности, при этом number == 1!
     if number == 1:
-        result = minimize(AOptimality, U, args=(Ksik, p, number, lenQ, ), method='cobyla')
+        result = minimize(AOptimality, U, args=(Ksik, p, number, ), method='SLSQP', jac=dAOptimality, bounds=bounds)
         # print("\nresult:\n", result)
         return result.__getitem__("x")
 
     # Расчёт nuUk, при этом number == 2!:
     if number == 2:
-        return AOptimality(U=U, Ksik=Ksik, p=p, number=number, lenQ=lenQ)
+        return AOptimality(U=U, Ksik=Ksik, p=p, number=number)
 
     # Расчёт эты, при этом number == 3!:
     if number == 3:
         # print("\nKsik:\n", Ksik)
-        return AOptimality(U=Ksik, Ksik=U, p=p, number=number, lenQ=lenQ)
+        return AOptimality(U=Ksik, Ksik=U, p=p, number=number)
 
     # Расчёт tk, при этом number == 4!:
     if number == 4:
-        XMKsi = minimize(AOptimality, x0=Ksik, args=(U, p, number, lenQ, ), method='cobyla')
+        XMKsi = minimize(AOptimality, x0=Ksik, args=(U, p, number, ), method='cobyla')
         # print("\nXMKsi:\n", XMKsi)
-    return AOptimality(U=XMKsi.__getitem__('x'), Ksik=U, p=p, number=number, lenQ=lenQ)
+    return AOptimality(U=XMKsi.__getitem__('x'), Ksik=U, p=p, number=number)
 
 
 
@@ -412,7 +424,7 @@ def Optimalitys(U, Ksik, p, number, lenQ):
 def ADPlan_third_lab():
     # 1 пункт:
     startMatrixPlan, Ksik, p = startPlan()
-    Uk = np.zeros((N, 1))
+
     count = 0
     # 2 пункт:
     while count != 2:
@@ -423,7 +435,8 @@ def ADPlan_third_lab():
                 for stepi in range(1):
                     KsikLine.append(Ksik[stepz][stepj][stepi])
         KsikLine = np.array(KsikLine)
-        print("\nKsikLine:\n", KsikLine)
+        print("\nKsikLine:\n", KsikLine,
+              "\np:\n", p)
         while 1:
             U0 = np.array([[float(np.random.uniform(0.1, 10.)) for stepi in range(1)] for stepj in range(N)])
             Uk = Optimalitys(U=U0, Ksik=KsikLine, p=p, number=1, lenQ=len(p))
@@ -443,9 +456,10 @@ def ADPlan_third_lab():
         if count == 0:
             KsikLine, p = NewPlan(Optimalitys(U=Uk, Ksik=KsikLine, p=p, number=4, lenQ=len(p)), Ksik=KsikLine, Uk=Uk, p=p)
             count += 1
-        tk = Optimalitys(U=Uk, Ksik=KsikLine, p=p, number=4, lenQ=len(p))
-        Ksik, p = NewPlan(tk, Ksik=KsikLine, Uk=Uk, p=p)
-        Ksik, p = CleaningPlan(Ksik, p)
+        if count != 2:
+            tk = Optimalitys(U=Uk, Ksik=KsikLine, p=p, number=4, lenQ=len(p))
+            Ksik, p = NewPlan(tk, Ksik=KsikLine, Uk=Uk, p=p)
+            Ksik, p = CleaningPlan(Ksik, p)
     print("\nPlan A is done!\n",
           "\nResults:\n", "\nKsik:\n", Ksik, "\np:\n", p)
 
@@ -456,7 +470,7 @@ if __name__ == '__main__':
     r = 1 # Количество начальных сигналов, альфа
     n = 2 # Размерность вектора х0
     s = 2 # Количество производных по тетта
-    N = 3 # Число испытаний
+    N = 4 # Число испытаний
 
     q = int(1 + (s*(s + 1)) / 2)
     delta = 0.0001
