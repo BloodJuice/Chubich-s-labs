@@ -334,49 +334,36 @@ def NewPlan(tk, Ksik, Uk, p):
     pNew = np.hstack((p, tk))
     return ksikNew, pNew
 def CleaningPlan(Ksik, p):
-    count = Counter(p).most_common()
-    newpi = [i for i in count if int(i[1]) >= 2] # p, содержащая только веса, которые встречаются больше двух раз
+    newp = [] # p, содержащая только веса, которые встречаются больше двух раз
     newKsik = []
-    saverDraft, saverCount = [], []
-
-    # Ищу номера позиций векторов с одинаковыми весами при помощи списка р
-    for i in range(len(newpi)):
-        for j in range(len(p)):
-            if p[j] == newpi[i][0]:
-                saverDraft.append(j)
-        saverCount.append(saverDraft)
-        saverDraft = []
+    Q = len(p)
     print("\np:\n", p)
+    Ksik = Ksik.reshape(Q, N, 1)
+    pDelPoint = []
 
-    # Объединение всех одинаковых весов, которые встречаются чаще одного раза:
-    Ksik = Ksik.reshape(len(p), N, 1)
-    for i in range(len(newpi)):
-        for j in range(len(saverCount[i]) - 1):
-            Ksik[saverCount[i][0]] += Ksik[saverCount[i][j + 1]]
-        newKsik.append(Ksik[saverCount[i][0]])
+    for stepi in range(Q - 1):
+        for stepj in range(stepi + 1, Q - stepi):
+            if np.dot(Ksik[stepi].transpose(), Ksik[stepj]) <= delta:
+                p[stepi] += p[stepj]
+                pDelPoint.append(stepj)
 
-    # Ищу номера позиций векторов с одинаковыми весами при помощи списка р
-    newpj = [i for i in count if int(i[1]) == 1] # p, содержащая только веса, которые встречаются один раз
-    saverCount *= 0
-    for i in range(len(newpj)):
-        for j in range(len(p)):
-            if p[j] == newpj[i][0]:
-                saverDraft.append(j)
-        saverCount.append(saverDraft)
-        saverDraft = []
+    for stepi in range(Q):
+        if p[stepi] < delta:
+            pDelPoint.append(stepi)
+    print("\npDelPoint:\n", pDelPoint)
+    for stepi in range(Q):
+        if stepi not in pDelPoint:
+            newKsik.append(Ksik[stepi])
+            newp.append(p[stepi])
 
-    # Объединение всех одинаковых весов, которые встречаются один раз:
-    for i in range(len(newpj)):
-        for j in range(len(saverCount[i]) - 1):
-            Ksik[saverCount[i][0]] += Ksik[saverCount[i][j + 1]]
-        newKsik.append(Ksik[saverCount[i][0]])
+    # Уравновешиваю веса, приводя их сумму к 1:
+    pSum = sum(newp)
+    if pSum != (1.0 - delta) or pSum != (1.0 + delta):
+        for stepi in range(len(newp)):
+            newp[stepi] *= (1.0 / pSum)
 
-    # Создание нового списка значений р:
-    newpi += newpj
-    newp = []
-    for i in range(len(newpi)):
-        newp.append(newpi[i][0])
-    print("\nnewKsik:\n", newKsik)
+    newKsik = np.array(newKsik)
+    newp = np.array(newp)
     return newKsik, newp
 
 def AOptimality(U, Ksik, p, number, lenQ):
@@ -395,7 +382,6 @@ def AOptimality(U, Ksik, p, number, lenQ):
         return (np.linalg.inv(MatrixForPlan(Ksik, p))).trace()
 
 def Optimalitys(U, Ksik, p, number, lenQ):
-    result = ''
     XMKsi = ''
     print("\nmimimize...\n")
 
@@ -426,11 +412,10 @@ def Optimalitys(U, Ksik, p, number, lenQ):
 def ADPlan_third_lab():
     # 1 пункт:
     startMatrixPlan, Ksik, p = startPlan()
-    tk = 0.1
     Uk = np.zeros((N, 1))
     count = 0
     # 2 пункт:
-    while 1:
+    while count != 2:
         # Данный список мне необходим для запуска всех минимизаций, т.к. Эти самые минимизации требуют списки, размером (n, )
         KsikLine = []
         for stepz in range(len(Ksik)):
@@ -444,12 +429,11 @@ def ADPlan_third_lab():
             Uk = Optimalitys(U=U0, Ksik=KsikLine, p=p, number=1, lenQ=len(p))
             nuUk = Optimalitys(U=Uk, Ksik=KsikLine, p=p, number=2, lenQ=len(p))
             eta = Optimalitys(U=U0, Ksik=KsikLine, p=p, number=3, lenQ=len(p))
-            # print("\nUk:\n", Uk,
-            #       "\neta:\n", eta,
-            #       "\nnuUk:\n", nuUk)
+            print("\nUk:\n", Uk,
+                  "\neta:\n", eta,
+                  "\nnuUk:\n", nuUk)
             if abs(nuUk - eta) <= delta:
-                # print("\nGood job!\n", KsikLine.reshape(len(p), N, 1),
-                #       "\np:\n", p)
+                count = 2
                 break
             elif nuUk > eta:
                 print("\nLet's go to the third point!\n")
@@ -457,12 +441,13 @@ def ADPlan_third_lab():
             else:
                 print("\nLet's go to the second point!\n")
         if count == 0:
-            KsikLine, p = NewPlan(tk, Ksik=KsikLine, Uk=Uk, p=p)
+            KsikLine, p = NewPlan(Optimalitys(U=Uk, Ksik=KsikLine, p=p, number=4, lenQ=len(p)), Ksik=KsikLine, Uk=Uk, p=p)
             count += 1
         tk = Optimalitys(U=Uk, Ksik=KsikLine, p=p, number=4, lenQ=len(p))
         Ksik, p = NewPlan(tk, Ksik=KsikLine, Uk=Uk, p=p)
         Ksik, p = CleaningPlan(Ksik, p)
-        print("\nKsik, end cycle:\n", Ksik)
+    print("\nPlan A is done!\n",
+          "\nResults:\n", "\nKsik:\n", Ksik, "\np:\n", p)
 
 if __name__ == '__main__':
     # Определение переменных
