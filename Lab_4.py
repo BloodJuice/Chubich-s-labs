@@ -394,12 +394,9 @@ def dAOptimality(U, Ksik, p, number):
 def Optimalitys(U, Ksik, p, number, lenQ):
     XMKsi = ''
     print("\nmimimize...\n")
-    lim = [0, 0, 0, 10, 10, 10]
-    bounds = Bounds([lim[0], lim[0],
-                     lim[3], lim[3]])
     # Расчёт ню для А-оптимальности, при этом number == 1!
     if number == 1:
-        result = minimize(AOptimality, U, args=(Ksik, p, number, ), method='SLSQP', jac=dAOptimality, bounds=bounds)
+        result = minimize(AOptimality, U, args=(Ksik, p, number, ), method='SLSQP', jac=dAOptimality, bounds=Bounds(0, 10))
         # print("\nresult:\n", result)
         return result.__getitem__("x")
 
@@ -424,7 +421,6 @@ def Optimalitys(U, Ksik, p, number, lenQ):
 def ADPlan_third_lab():
     # 1 пункт:
     startMatrixPlan, Ksik, p = startPlan()
-
     count = 0
     # 2 пункт:
     while count != 2:
@@ -439,6 +435,8 @@ def ADPlan_third_lab():
               "\np:\n", p)
         while 1:
             U0 = np.array([[float(np.random.uniform(0.1, 10.)) for stepi in range(1)] for stepj in range(N)])
+            if count == 0:
+                print("\nA-Optimality start:\n", Optimalitys(U=U0, Ksik=KsikLine, p=p, number=4, lenQ=len(p)))
             Uk = Optimalitys(U=U0, Ksik=KsikLine, p=p, number=1, lenQ=len(p))
             nuUk = Optimalitys(U=Uk, Ksik=KsikLine, p=p, number=2, lenQ=len(p))
             eta = Optimalitys(U=U0, Ksik=KsikLine, p=p, number=3, lenQ=len(p))
@@ -462,6 +460,7 @@ def ADPlan_third_lab():
             Ksik, p = CleaningPlan(Ksik, p)
     print("\nPlan A is done!\n",
           "\nResults:\n", "\nKsik:\n", Ksik, "\np:\n", p)
+    print("\nA-Optimality end:\n", Optimalitys(U=U0, Ksik=KsikLine, p=p, number=4, lenQ=len(p)))
 
 if __name__ == '__main__':
     # Определение переменных
@@ -473,11 +472,12 @@ if __name__ == '__main__':
     N = 4 # Число испытаний
 
     q = int(1 + (s*(s + 1)) / 2)
-    delta = 0.0001
+    delta = 0.001
 
     tetta_true = np.array([-1.5, 1.0])
     tetta_false = np.array([-2, 0.01])
 
     ADPlan_third_lab()
+
 
 
