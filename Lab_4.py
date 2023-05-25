@@ -339,7 +339,7 @@ def startPlan():
 def NewPlan(tk, Ksik, Uk, p):
     ksikNew = np.hstack((Ksik, Uk))
     for i in range(len(p)):
-        p[i] = (1 - tk) * p[i]
+        p[i] = (1. - tk) * p[i]
     pNew = np.hstack((p, tk))
     return ksikNew, pNew
 def CleaningPlan(Ksik, p):
@@ -349,8 +349,6 @@ def CleaningPlan(Ksik, p):
     pDelPoint = []
     Q = len(p)
 
-    print("\nCleaning Plan Ksik:\n", Ksik,
-          "\np:\n", p)
     Ksik = Ksik.reshape(Q, N, 1)
     for stepi in range(Q - 1):
         for stepj in range(stepi + 1, Q - stepi):
@@ -374,8 +372,6 @@ def CleaningPlan(Ksik, p):
             newp[stepi] *= (1.0 / pSum)
 
     newKsik = (np.array(newKsik)).reshape(len(newp), N, 1)
-    print("\nnewKsik:\n", newKsik,
-          "\nnewp:\n", newp)
     newp = np.array(newp)
     return newKsik, newp
 
@@ -398,11 +394,11 @@ def AOptimality(U, Ksik, p, number):
 
 def XMKsi(tk, params):
     # Принимает в себя Ksik, U в виде векторов (n, )
-    Ksik = params['Ksik']
+    Ksik = params['Ksik'].copy()
     Uk = params['U']
-    p = params['p']
+    pi = params['pi'].copy()
 
-    KsikNew, pNew = NewPlan(tk, Ksik, Uk, p)
+    KsikNew, pNew = NewPlan(tk, Ksik, Uk, pi)
     KsikNew = KsikNew.reshape(len(pNew), N, 1)
     return (np.linalg.inv(MatrixForPlan(KsikNew, pNew))).trace()
 
@@ -440,7 +436,7 @@ def Optimalitys(U, Ksik, p, number):
 
     # Расчёт tk, при этом number == 4!:
     if number == 4:
-        XM = minimize(XMKsi, x0=np.random.uniform(0, 1), args={"Ksik":Ksik, "U":U, "p": p}, method='SLSQP', bounds=Bounds(0, 1))
+        XM = minimize(XMKsi, x0=np.random.uniform(0, 1), args={"Ksik":Ksik, "U":U, "pi": p}, method='SLSQP', bounds=Bounds(0, 1))
     return XM.__getitem__("x")
 
 def ADPlan_third_lab():
@@ -451,8 +447,6 @@ def ADPlan_third_lab():
     # 2 пункт:
     while count != 2:
         # Данный список мне необходим для запуска всех минимизаций, т.к. Эти самые минимизации требуют списки, размером (n, )
-        print("\nKsik:\n", Ksik,
-                "\np:\n", p)
         while 1:
             U0 = np.array([[float(np.random.uniform(0.1, 10.)) for stepi in range(1)] for stepj in range(N)])
             if count == 0:
@@ -461,9 +455,9 @@ def ADPlan_third_lab():
             Uk = Optimalitys(U=U0, Ksik=Ksik, p=p, number=1)
             nuUk = Optimalitys(U=Uk, Ksik=Ksik, p=p, number=2)
             eta = Optimalitys(U=U0, Ksik=Ksik, p=p, number=3)
-            print("\nUk:\n", Uk,
-                  "\neta:\n", eta,
-                  "\nnuUk:\n", nuUk)
+            # print("\nUk:\n", Uk,
+            #       "\neta:\n", eta,
+            #       "\nnuUk:\n", nuUk)
             if abs(nuUk - eta) <= delta:
                 count = 2
                 break
@@ -475,17 +469,11 @@ def ADPlan_third_lab():
 
         if count != 2:
         # Третий шаг:
-            print("\n3 Пункт:   Ksik:\n", Ksik,
-              "\np:\n", p)
             tk = Optimalitys(U0, Ksik, p, 4)
-            print("\n3 Пункт:   Ksik:\n", Ksik,
-                "\np:\n", p)
 
         # Четвёртый шаг, создаём новый план и производим его очистку:
             Ksik, p = NewPlan(tk, Ksik=LineForKsi(Ksik), Uk=Uk, p=p)
             Ksik, p = CleaningPlan(Ksik, p)
-            print("\n4point Ksik:\n", Ksik,
-                  "\np:\n", p)
     print("\nPlan A is done!\n",
           "\nResults:\n", "\nKsik:\n", Ksik, "\np:\n", p)
     print("\nA-Optimality end:\n", AOptimality(U=Ksik, Ksik=U0, p=p, number=4))
@@ -500,7 +488,7 @@ if __name__ == '__main__':
     N = 4 # Число испытаний
 
     q = int(1 + (s*(s + 1)) / 2)
-    delta = 0.001
+    delta = 0.0001
 
     tetta_true = np.array([-1.5, 1.0])
     tetta_false = np.array([-2, 0.01])
