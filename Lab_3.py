@@ -305,8 +305,8 @@ def dIMF(tetta):
     dMdu_count = np.zeros((2, 2))
     for i in range(r*N):
         dMdu_count += dMdu[i]
-        print("\nM[", i, "]\n",dMdu[i])
-    # print("\ndMdu_count:\n", dMdu_count)
+        # print("\nM[", i, "]\n",dMdu[i])
+    print("\ndMdu_count:\n", dMdu_count)
 
 
 
@@ -318,8 +318,6 @@ if __name__ == '__main__':
     n = 1 # Размерность вектора х0
     s = 2 # Количество производных по тетта
     N = 2 # Число испытаний
-
-
 
     delta = 0.00001
 
