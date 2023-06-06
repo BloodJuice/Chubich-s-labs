@@ -61,7 +61,7 @@ def y(R, tetta, N, plan):
     F, Psi, H, o, xt0, l = initVariables(tetta, mode)
     xtk = 0
     yEnd = []
-    q = len(plan[0])
+    q = len(plan)
     for _ in range(q):
         yPlus = []
         for stepj in range(N):
@@ -78,7 +78,7 @@ def Xi(tetta, params):
     # Инициализация матриц/векторов, 1, 2 пункты:
     y = params['y'].copy()
     plan = params['plan'].copy()
-    k = params['k'].copy()
+    k = params['k']
     v = params['v']
     m = params['m']
     R = params['R']
@@ -107,11 +107,12 @@ def Xi(tetta, params):
             for j in range(int(k[i])):
                 epsPlusOne = y[i][kCount][0] - np.dot(H, xPlusOne)
                 Triangle += np.multiply(epsPlusOne.transpose(), epsPlusOne) * pow(R, -1)
+            if kCount + 1 < N:
+                xtk[i][kCount + 1] = xPlusOne
+            else:
+                xtk[i][kCount] = xPlusOne
         xi += Triangle
-        if kCount + 1 < N:
-            xtk[i][kCount + 1] = xPlusOne
-        else:
-            xtk[i][kCount] = xPlusOne
+
     return 0.5 * xi
 
 def dXi(tetta, params):
@@ -119,7 +120,7 @@ def dXi(tetta, params):
     mode = 2
     y = params['y'].copy()
     plan = params['plan'].copy()
-    k = params['k'].copy()
+    k = params['k']
     v = params['v']
     m = params['m']
     R = params['R']
@@ -139,7 +140,7 @@ def dXi(tetta, params):
     # Point 5
     xtk = np.array([[np.full(shape=2, fill_value=0, dtype=float).reshape(2, 1) for stepj in range(N)] for stepi in range(q)])
     dxtk = np.array([[[np.full(shape=2, fill_value=0, dtype=float).reshape(2, 1) for stepj in range(N)] for stepi in range(q)] for alpha in range(s)])
-    dxPlusOne = np.array([0 for alpha in range(s)])
+    dxPlusOne = np.array([np.zeros((2, 1)) for alpha in range(s)])
     depsPlusOne = np.array([0 for alpha in range(s)])
 
     for kCount in range(0, N):
@@ -156,8 +157,8 @@ def dXi(tetta, params):
 
             # Point 7
             for alpha in range(s):
-                dxtk[alpha][i][kCount] = np.dot(dF[alpha], xtk[i][kCount]) + np.dot(F, dxtk[alpha][i][kCount]) + np.dot(dPsi[alpha], u[i][kCount][0])
-                depsPlusOne[alpha] = (-1) * np.dot(dH[alpha], xtk[alpha][kCount]) - np.dot(H, dxtk[alpha][i][kCount])
+                dxPlusOne[alpha] = np.dot(dF[alpha], xtk[i][kCount]) + np.dot(F, dxtk[alpha][i][kCount]) + np.dot(dPsi[alpha], u[i][kCount][0])
+                depsPlusOne[alpha] = (-1) * np.dot(dH[alpha], xtk[i][kCount]) - np.dot(H, dxPlusOne[alpha])
 
             for j in range(int(k[i])):
                 epsPlusOne = y[i][kCount][0] - np.dot(H, xPlusOne)
@@ -165,17 +166,18 @@ def dXi(tetta, params):
                     Triangle[alpha] += np.dot(np.dot(depsPlusOne[alpha].transpose(), pow(R, -1)), epsPlusOne) - \
                                        (0.5) * np.dot(np.dot(depsPlusOne[alpha].transpose(), pow(R, -1)), dR[alpha]) * \
                                        np.dot(pow(R, -1), epsPlusOne)
+            if kCount + 1 < N:
+                xtk[i][kCount + 1] = xPlusOne
+                for alpha in range(s):
+                    dxtk[alpha][i][kCount + 1] = dxPlusOne[alpha]
+            else:
+                xtk[i][kCount] = xPlusOne
+                for alpha in range(s):
+                    dxtk[alpha][i][kCount] = dxPlusOne[alpha]
         for alpha in range(s):
             gradient[alpha] += Triangle[alpha]
 
-        if kCount + 1 < N:
-            xtk[i][kCount + 1] = xPlusOne
-            for alpha in range(s):
-                dxtk[alpha][i][kCount + 1] = dxtk[alpha][i][kCount]
-        else:
-            xtk[i][kCount] = xPlusOne
-            for alpha in range(s):
-                dxtk[alpha][i][kCount] = dxtk[alpha][i][kCount]
+
     return gradient
 
 def KsiStart(q):
@@ -677,10 +679,10 @@ def main(tettaTrue, tettaFalse):
 
     tettaNew = MinimizeFirst(tettaFalse, yRun, startPlan, k, v, m, R)
     newPlan, pNew = ADPlan_third_lab(tettaNew.reshape(2, 1))
-
     # 6 lr:
     k, v = rounding(pNew)
-    tettaNew = MinimizeFirst(tettaFalse, yRun, startPlan, k, v, m, R)
+    yRun = y(R, tettaTrue, N, newPlan)
+    tettaNew = MinimizeFirst(tettaNew, yRun, newPlan, k, v, m, R)
 
 if __name__ == '__main__':
     # Определение переменных
