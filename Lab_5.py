@@ -56,7 +56,7 @@ def MinimizeFirst(tettaMin, yRun, plan, k, v, m, R):
     return np.array(result.__getitem__("x")). reshape(2, 1)
 
 
-def y(R, tetta, N, plan):
+def y(R, tetta, N, plan, count):
     mode = n
     F, Psi, H, o, xt0, l = initVariables(tetta, mode)
     xtk = 0
@@ -68,7 +68,7 @@ def y(R, tetta, N, plan):
             if stepj == 0:
                 xtk = np.array([[0], [0]])
             xPlus = np.add(np.dot(F, xtk), np.dot(Psi, plan[_][stepj][0]))
-            yPlus.append(np.add(np.dot(H, xPlus)[0][0], (np.random.normal(0, 1.) * R)))
+            yPlus.append(np.add(np.dot(H, xPlus)[0][0], (np.random.normal(0, 1.) * R * count)))
             xtk = xPlus
         yEnd.append(np.array(yPlus).reshape(N, 1))
     yEnd = np.array(yEnd)
@@ -605,9 +605,6 @@ def ADPlan_third_lab(tetta):
             Uk = Optimalitys(U=U0, Ksik=Ksik, p=p, number=1, tetta=tetta)
             nuUk = Optimalitys(U=Uk, Ksik=Ksik, p=p, number=2, tetta=tetta)
             eta = Optimalitys(U=U0, Ksik=Ksik, p=p, number=3, tetta=tetta)
-            # print("\nUk:\n", Uk,
-            #       "\neta:\n", eta,
-            #       "\nnuUk:\n", nuUk)
             if abs(nuUk - eta) <= delta:
                 count = 2
                 break
@@ -668,21 +665,59 @@ def rounding(pNew):
         kNew[i] = sigm[i] + s[i]
     return kNew, v
 
+def relativeError(true, Middle):
+    startPoint = np.subtract(true, Middle)
+    # print("\nstartPoint:\n", startPoint)
+    n, Sum1, Sum2 = len(startPoint), 0, 0
+
+    # print("\nn:\n", n)
+    for stepi in range(n):
+        Sum1 += pow(startPoint[stepi][0], 2)
+    Sum1 = pow(Sum1, 0.5)
+    for stepi in range(n):
+        Sum2 += pow(true[stepi], 2)
+    Sum2 = pow(Sum2, 0.5)
+
+    return np.divide(Sum1, Sum2)
+
+
 def main(tettaTrue, tettaFalse):
     R, m = 0.1, 1. # Nubmber of derivatives
     q = int(1 + s * (s + 1) / 2) # Number of k
     k = [1.0 for stepi in range(q)]  # Initial number of system start
     v = q
+    tettaStart, tettaMiddleStart, tettaPlan, tettaMiddlePlan = [], np.array([[0], [0]]), [], np.array([[0], [0]])
+    newPlan, tettaNew, noise = [], [], 2.
 
-    startPlan = KsiStart(q)
-    yRun = y(R, tettaTrue, N, startPlan)
+    for i in range(5):
+        startPlan = KsiStart(q)
+        yRun = y(R, tettaTrue, N, startPlan, noise)
 
-    tettaNew = MinimizeFirst(tettaFalse, yRun, startPlan, k, v, m, R)
-    newPlan, pNew = ADPlan_third_lab(tettaNew.reshape(2, 1))
-    # 6 lr:
-    k, v = rounding(pNew)
-    yRun = y(R, tettaTrue, N, newPlan)
-    tettaNew = MinimizeFirst(tettaNew, yRun, newPlan, k, v, m, R)
+        tettaNew = MinimizeFirst(tettaFalse, yRun, startPlan, k, v, m, R)
+        tettaStart.append(tettaNew)
+
+        newPlan, pNew = ADPlan_third_lab(tettaNew.reshape(2, 1))
+        k, v = rounding(pNew)
+        yRun = y(R, tettaTrue, N, newPlan, noise)
+        tettaNew = MinimizeFirst(tettaNew, yRun, newPlan, k, v, m, R)
+        tettaPlan.append(tettaNew)
+    tettaStart = np.array(tettaStart)
+    tettaPlan = np.array(tettaPlan)
+
+    print("\ntettaStart\n", tettaStart[0], "\ntettaMiddleSint:\n", tettaPlan)
+    for stepi in range(5):
+        tettaMiddleStart = np.add(tettaMiddleStart, tettaStart[stepi])
+        tettaMiddlePlan = np.add(tettaMiddlePlan, tettaPlan[stepi])
+    tettaMiddleStart = np.divide(tettaMiddleStart, 5.)
+    tettaMiddlePlan = np.divide(tettaMiddlePlan, 5.)
+
+    print("\ntettaMiddleStart:\n", tettaMiddleStart, "\ntettaMiddlePlan:\n", tettaMiddlePlan)
+    print("\nrelativeError tettaMiddleStart:\n", relativeError(tettaTrue, tettaMiddleStart))
+    print("\nrelativeError tettaMiddlePlan:\n", relativeError(tettaTrue, tettaMiddlePlan))
+
+    # Ymiddle:
+    print("\nrelativeError YmiddleStart:\n", relativeError(y(R, tettaNew, N, newPlan, noise)[0], y(R, tettaMiddleStart, N, newPlan, noise)[0]))
+    print("\nrelativeError YmiddlePlan:\n", relativeError(y(R, tettaNew, N, newPlan, noise)[0], y(R, tettaMiddlePlan, N, newPlan, noise)[0]))
 
 if __name__ == '__main__':
     # Определение переменных
